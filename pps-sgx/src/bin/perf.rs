@@ -88,6 +88,7 @@ async fn main() -> anyhow::Result<()> {
         let keys_bundle =
             serde_json::to_vec(&keys_bundle).context("serialize enclave ciphertext")?;
         println!(" └ receiver keys generation: completed");
+        println!(" └ receiver public key size: {}", serde_json::to_vec(&pk).context("serialize public key")?.len());
         let response = client
             .setup(SetupRequest {
                 encrypted_public_keys: keys_bundle,
@@ -141,12 +142,18 @@ async fn main() -> anyhow::Result<()> {
             let ctr = receive_req_i - 1;
             let signature = vk.sign(ctr.into()).context("sign ctr")?;
             let public_key_bytes = serde_json::to_vec(&pk).context("serialize public key")?;
-            let response = client
-                .receive(ReceiveRequest {
+            let request = ReceiveRequest {
                     public_key: public_key_bytes,
                     ctr: ctr.into(),
                     signature: signature.bytes,
-                })
+                };
+            println!(" └ request message length: {}",
+                serde_json::to_vec(&request.public_key).context("serialize request")?.len() +
+                serde_json::to_vec(&request.ctr).context("serialize request")?.len() +
+                serde_json::to_vec(&request.signature).context("serialize request")?.len()
+            );
+            let response = client
+                .receive(request)
                 .await
                 .context("`receive` request")?;
             let took = response.get_took_time().context("get took-time")?;
